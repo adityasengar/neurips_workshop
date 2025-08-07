@@ -52,7 +52,7 @@ After simulating dynamics in the latent space, you will have a trajectory of lat
 **Example Usage (Decoding the trial Langevin trajectory):**
 
 ```bash
-python inference_old.py \
+python inference.py \
     --config param_old.yaml \
     --hno_ckpt checkpoints/hno_checkpoint.pth \
     --decoder2_ckpt checkpoints/decoder2_checkpoint.pth \
