@@ -1,3 +1,42 @@
+#!/usr/bin/env python3
+import os
+import sys
+import yaml
+import h5py
+import torch
+import argparse
+import numpy as np
+import torch.nn as nn
+import torch.nn.functional as F
+import logging
+from typing import Dict, List, Optional, Tuple, Any
+
+# Need imports for classes/functions used
+from torch_geometric.nn import ChebConv # For HNO definition
+from torch_cluster import knn_graph # Needed if calculating z_ref
+
+##############################################################
+# Copied Class Definitions from Script M (Response #16)
+##############################################################
+
+
+class HNO(nn.Module):
+    def __init__(self, hidden_dim, K):
+        super().__init__()
+        self._debug_logged = False  # For one-time debug logging
+        logger.debug(f"Initializing HNO with hidden_dim={hidden_dim}, K={K}")
+        sys.stdout.flush()
+        # Input dimension is 3 (x, y, z coordinates)
+        self.conv1 = ChebConv(3, hidden_dim, K=K)
+        self.conv2 = ChebConv(hidden_dim, hidden_dim, K=K)
+        self.conv3 = ChebConv(hidden_dim, hidden_dim, K=K)
+        self.conv4 = ChebConv(hidden_dim, hidden_dim, K=K)
+        # BatchNorm applied on the feature dimension (hidden_dim)
+        self.bano1 = nn.BatchNorm1d(hidden_dim)
+        self.bano2 = nn.BatchNorm1d(hidden_dim)
+        self.bano3 = nn.BatchNorm1d(hidden_dim)
+        # Final MLP maps back to 3D coordinates
+        self.mlpRep = nn.Linear(hidden_dim, 3)
 
     def forward(self, x, edge_index, log_debug=False):
         x = x.float()
