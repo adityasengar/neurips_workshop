@@ -1,3 +1,4 @@
+  GNU nano 5.6.1                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            simulate_dynamics.py                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       
 import argparse
 import torch
 import h5py
@@ -140,9 +141,10 @@ def main():
     parser.add_argument("--diff_ckpt", type=str, required=True, help="Path to the trained diffusion model checkpoint.")
     
     # New arguments for specifying the starting embedding file
-    parser.add_argument("--start_emb_dir", type=str, default="latent_reps", help="Directory containing the starting generated embedding file.")
-    parser.add_argument("--start_exp_idx", type=int, required=True, help="Experiment index (e.g., 1, 2, 3) of the generated embedding from new_diff.py.")
-    parser.add_argument("--start_conservative_mode", action="store_true", help="Set if the starting embedding is from a conservative diffusion run (e.g., generated_embeddings_expX_conservative.h5).")
+    parser.add_argument("--start_emb_file_name", type=str, help="Absolute path to the HDF5 file containing the starting latent embedding. If provided, --start_emb_dir, --start_exp_idx, and --start_conservative_mode are ignored for filename construction.")
+    parser.add_argument("--start_emb_dir", type=str, default="latent_reps", help="(Used if --start_emb_file_name is not provided) Directory containing the starting generated embedding file.")
+    parser.add_argument("--start_exp_idx", type=int, default=0, help="Index of the specific embedding within the HDF5 file to use as the starting point. Defaults to 0 (first embedding).")
+    parser.add_argument("--start_conservative_mode", action="store_true", help="(Used if --start_emb_file_name is not provided) Set if the starting embedding is from a conservative diffusion run (e.g., generated_embeddings_expX_conservative.h5).")
     parser.add_argument("--start_emb_key", type=str, default="generated_embeddings", help="Dataset key for the starting embedding in HDF5 file.")
 
     parser.add_argument("--num_steps", type=int, required=True, help="The number of simulation steps to perform.")
@@ -162,14 +164,23 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    # --- Construct path to Starting Embedding ---
-    start_emb_filename = f"generated_embeddings_exp{args.start_exp_idx}"
-    if args.start_conservative_mode:
-        start_emb_filename += "_conservative.h5"
+    # --- Determine path to Starting Embedding ---
+    if args.start_emb_file_name:
+        full_start_emb_path = pathlib.Path(args.start_emb_file_name)
     else:
-	start_emb_filename += "_non_conservative.h5"
-    
-    full_start_emb_path = pathlib.Path(args.start_emb_dir) / start_emb_filename
+        # Fallback to old logic if direct filename is not provided
+        # The start_exp_idx refers to the index within the generated_embeddings_expX_...h5 file.
+        # The filename itself should be based on the experiment index used during new_diff.py training.
+        # Assuming the user's previous new_diff.py run used exp_idx 1.
+        # This 'diffusion_gen_exp_idx' is for constructing the filename, not selecting the sample.
+        # It's a bit ambiguous, but keeping it for backward compatibility if start_emb_file_name is not used.
+        diffusion_gen_exp_idx = args.start_exp_idx # Use start_exp_idx for filename construction if no direct filename
+        start_emb_filename = f"generated_embeddings_exp{diffusion_gen_exp_idx}"
+        if args.start_conservative_mode:
+            start_emb_filename += "_conservative.h5"
+        else:
+            start_emb_filename += "_non_conservative.h5"
+        full_start_emb_path = pathlib.Path(args.start_emb_dir) / start_emb_filename
 
     # Load starting vector and extract metadata
     try:
@@ -350,3 +361,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
