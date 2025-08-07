@@ -5,7 +5,7 @@ This guide focuses on the `simulate_dynamics.py` script for performing Langevin 
 ## 1. Simulating Langevin Dynamics (`simulate_dynamics.py`)
 
 ### What it Does
-The `simulate_dynamics.py` script performs Langevin dynamics simulations directly within the latent space learned by the diffusion model. It uses a pre-trained diffusion model (either conservative or non-conservative) to estimate the "forces" (score function) that guide the movement of the latent vector. This allows for the generation of dynamic traj>
+The `simulate_dynamics.py` script performs Langevin dynamics simulations directly within the latent space learned by the diffusion model. It uses a pre-trained diffusion model (either conservative or non-conservative) to estimate the "forces" (score function) that guide the movement of the latent vector. This allows for the generation of dynamic trajectories of protein conformations in the latent space.
 
 The script infers crucial model parameters (like `model_type`, `hidden_dim`, `diffusion_steps`, `beta_start`, `beta_end`, and `conservative` flag) directly from the attributes stored within the input HDF5 embedding file. This ensures compatibility with the specific diffusion model that generated the starting embedding.
 
@@ -78,6 +78,3 @@ python convert_h5_to_xtc.py \
     --ref_pdb /scratch/asengar/long_sim/atlas/kinase_1ptq_perturn/heavy_chain.pdb \
     --output_xtc structures/full_coords_langevin_trajectory_trial.xtc
 ```
-This command will generate an XTC file (e.g., `structures/full_coords_langevin_trajectory_trial.xtc`) which can be loaded into molecular visualization tools.
-
-
