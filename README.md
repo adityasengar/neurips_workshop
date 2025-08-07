@@ -32,8 +32,8 @@ This script performs Langevin dynamics simulations directly within the latent sp
 python simulate_dynamics.py \
     --diff_config param_diff.yaml \
     --diff_ckpt checkpoints/diffusion_checkpoint_exp1.pth \
-    --start_emb_dir latent_reps \
-    --start_exp_idx 1 \
+    --start_emb_file_name latent_reps/generated_embeddings_exp1_non_conservative.h5 \
+    --start_emb_key generated_embeddings \
     --num_steps 100 \
     --temperature 0.0 \
     --output_file latent_reps/langevin_trajectory_trial.h5 \
@@ -42,45 +42,23 @@ python simulate_dynamics.py \
     --save_frequency 1
 ```
 
-**Small Example Run (Langevin -> Inference -> XTC):**
+**Small Example Run:**
 
-1.  **Simulate Langevin Dynamics:**
-    ```bash
-    python simulate_dynamics.py \
-        --diff_config param_diff.yaml \
-        --diff_ckpt checkpoints/diffusion_checkpoint_exp1.pth \
-        --start_emb_file_name latent_reps/generated_embeddings_exp1_non_conservative.h5 \
-        --start_emb_key generated_embeddings \
-        --num_steps 100 \
-        --temperature 0.0 \
-        --output_file latent_reps/langevin_trajectory_example.h5 \
-        --time_step_size 1e-8 \
-        --noise_level_t 0 \
-        --save_frequency 1
-    ```
-
-2.  **Run Inference on Langevin Trajectory:**
-    ```bash
-    python inference_old.py \
-        --config param.yaml \
-        --hno_ckpt checkpoints/hno_checkpoint.pth \
-        --decoder2_ckpt checkpoints/decoder2_checkpoint.pth \
-        --diff_emb_file latent_reps/langevin_trajectory_example.h5 \
-        --diff_emb_key langevin_trajectory \
-        --conditioner_x_ref_pt structures/X_ref_coords.pt \
-        --conditioner_z_ref_pt latent_reps/z_ref_embedding.pt \
-        --output_file structures/full_coords_langevin_trajectory_example.h5 \
-        --output_key full_coords_langevin_trajectory_example
-    ```
-
-3.  **Convert HDF5 to XTC Trajectory:**
-    ```bash
-    python convert_h5_to_xtc.py \
-        --h5_file structures/full_coords_langevin_trajectory_example.h5 \
-        --h5_key full_coords_langevin_trajectory_example \
-        --ref_pdb /scratch/asengar/long_sim/atlas/kinase_1ptq_perturn/heavy_chain.pdb \
-        --output_xtc structures/full_coords_langevin_trajectory_example.xtc
-    ```
+To run a short Langevin dynamics simulation:
+```bash
+python simulate_dynamics.py \
+    --diff_config param_diff.yaml \
+    --diff_ckpt checkpoints/diffusion_checkpoint_exp1.pth \
+    --start_emb_file_name latent_reps/generated_embeddings_exp1_non_conservative.h5 \
+    --start_emb_key generated_embeddings \
+    --num_steps 100 \
+    --temperature 0.0 \
+    --output_file latent_reps/langevin_trajectory_example.h5 \
+    --time_step_size 1e-8 \
+    --noise_level_t 0 \
+    --save_frequency 1
+```
+For subsequent inference and XTC conversion, refer to sections 2 and 3.
 
 ### 1.2. Linear Dynamics with a Koopman Operator (`fit_koopman_model.py`)
 
@@ -100,41 +78,20 @@ This method fits a single linear matrix `A` that approximates the system's dynam
 python fit_koopman_model.py --train_fraction 0.8 --svd_rank 20 --rollout_noise_std 0.01
 ```
 
-**Small Example Run (Koopman -> Inference -> XTC):**
+**Small Example Run:**
 
-1.  **Fit Koopman Model and Generate Rollout:**
-    ```bash
-    python fit_koopman_model.py \
-        --h5_file latent_reps/pooled_embedding.h5 \
-        --train_fraction 0.8 \
-        --svd_rank 20 \
-        --rollout_noise_std 0.01 \
-        --output_file koopman_operator_example.npy
-    ```
-    *Output H5 file: `latent_reps/koopman_rollout_train0p80_rank20.h5` (default naming based on parameters)*
+To fit a Koopman model and generate a rollout:
+```bash
+python fit_koopman_model.py \
+    --h5_file latent_reps/pooled_embedding.h5 \
+    --train_fraction 0.8 \
+    --svd_rank 20 \
+    --rollout_noise_std 0.01 \
+    --output_file koopman_operator_example.npy
+```
+*Output H5 file: `latent_reps/koopman_rollout_train0p80_rank20_noise1p00e-02.h5` (default naming based on parameters)*
 
-2.  **Run Inference on Koopman Trajectory:**
-    ```bash
-    python inference_old.py \
-        --config param.yaml \
-        --hno_ckpt checkpoints/hno_checkpoint.pth \
-        --decoder2_ckpt checkpoints/decoder2_checkpoint.pth \
-        --diff_emb_file latent_reps/koopman_rollout_train0p80_rank20.h5 \
-        --diff_emb_key koopman_rollout \
-        --conditioner_x_ref_pt structures/X_ref_coords.pt \
-        --conditioner_z_ref_pt latent_reps/z_ref_embedding.pt \
-        --output_file structures/full_coords_koopman_rollout_example.h5 \
-        --output_key full_coords_koopman_rollout_example
-    ```
-
-3.  **Convert HDF5 to XTC Trajectory:**
-    ```bash
-    python convert_h5_to_xtc.py \
-        --h5_file structures/full_coords_koopman_rollout_example.h5 \
-        --h5_key full_coords_koopman_rollout_example \
-        --ref_pdb /scratch/asengar/long_sim/atlas/kinase_1ptq_perturn/heavy_chain.pdb \
-        --output_xtc structures/full_coords_koopman_rollout_example.xtc
-    ```
+For subsequent inference and XTC conversion, refer to sections 2 and 3.
 
 ### 1.3. Non-Linear Dynamics with a Neural Network Propagator (`train_neural_propagator.py`)
 
@@ -155,46 +112,25 @@ This method trains a neural network to learn a potentially non-linear function `
 python train_neural_propagator.py --train_fraction 0.8 --frame_skip 5 --rollout_noise_std 0.01
 ```
 
-**Small Example Run (Neural Propagator -> Inference -> XTC):**
+**Small Example Run:**
 
-1.  **Train Neural Propagator and Generate Rollout:**
-    ```bash
-    python train_neural_propagator.py \
-        --h5_file latent_reps/pooled_embedding.h5 \
-        --train_fraction 0.8 \
-        --frame_skip 5 \
-        --rollout_noise_std 0.01 \
-        --epochs 10 \
-        --output_model_path neural_propagator_example.pth
-    ```
-    *Output H5 file: `latent_reps/nn_rollout_train0p80_skip5_noise0p01.h5` (default naming based on parameters)*
+To train a Neural Propagator and generate a rollout:
+```bash
+python train_neural_propagator.py \
+    --h5_file latent_reps/pooled_embedding.h5 \
+    --train_fraction 0.8 \
+    --frame_skip 5 \
+    --rollout_noise_std 0.01 \
+    --epochs 10 \
+    --output_model_path neural_propagator_example.pth
+```
+*Output H5 file: `latent_reps/nn_rollout_train0p80_skip5_noise1p00e-02.h5` (default naming based on parameters)*
 
-2.  **Run Inference on Neural Propagator Trajectory:**
-    ```bash
-    python inference_old.py \
-        --config param.yaml \
-        --hno_ckpt checkpoints/hno_checkpoint.pth \
-        --decoder2_ckpt checkpoints/decoder2_checkpoint.pth \
-        --diff_emb_file latent_reps/nn_rollout_train0p80_skip5_noise0p01.h5 \
-        --diff_emb_key nn_rollout \
-        --conditioner_x_ref_pt structures/X_ref_coords.pt \
-        --conditioner_z_ref_pt latent_reps/z_ref_embedding.pt \
-        --output_file structures/full_coords_nn_rollout_example.h5 \
-        --output_key full_coords_nn_rollout_example
-    ```
+For subsequent inference and XTC conversion, refer to sections 2 and 3.
 
-3.  **Convert HDF5 to XTC Trajectory:**
-    ```bash
-    python convert_h5_to_xtc.py \
-        --h5_file structures/full_coords_nn_rollout_example.h5 \
-        --h5_key full_coords_nn_rollout_example \
-        --ref_pdb /scratch/asengar/long_sim/atlas/kinase_1ptq_perturn/heavy_chain.pdb \
-        --output_xtc structures/full_coords_nn_rollout_example.xtc
-    ```
+## 2. Structure Reconstruction (Inference) (`inference_old.py`)
 
-## 2. Running Inference on Latent Trajectories (`inference_old.py`)
-
-After simulating dynamics in the latent space, you will have a trajectory of latent embeddings. To visualize these, you need to decode them back into 3D protein coordinates. For Langevin trajectories, `inference_old.py` is recommended due to its flexibility in accepting direct HDF5 input files.
+After simulating dynamics in the latent space, you will have a trajectory of latent embeddings. To visualize these, you need to decode them back into 3D protein coordinates.
 
 **Key Arguments:**
 
@@ -212,18 +148,18 @@ After simulating dynamics in the latent space, you will have a trajectory of lat
 
 ```bash
 python inference_old.py \
-    --config param_old.yaml \
+    --config param.yaml \
     --hno_ckpt checkpoints/hno_checkpoint.pth \
     --decoder2_ckpt checkpoints/decoder2_checkpoint.pth \
-    --diff_emb_file latent_reps/langevin_trajectory_trial.h5 \
+    --diff_emb_file latent_reps/langevin_trajectory_example.h5 \
     --diff_emb_key langevin_trajectory \
     --conditioner_x_ref_pt structures/X_ref_coords.pt \
     --conditioner_z_ref_pt latent_reps/z_ref_embedding.pt \
-    --output_file structures/full_coords_langevin_trajectory_trial.h5 \
-    --output_key full_coords_langevin_trajectory_trial
+    --output_file structures/full_coords_langevin_trajectory_example.h5 \
+    --output_key full_coords_langevin_trajectory_example
 ```
 
-## 3. Converting HDF5 to XTC Trajectory (`convert_h5_to_xtc.py`)
+## 3. Trajectory Conversion to XTC (`convert_h5_to_xtc.py`)
 
 The final 3D coordinates are stored in an HDF5 file. For visualization in molecular dynamics software (like VMD or PyMOL), it's often useful to convert this HDF5 file into an XTC trajectory format.
 
@@ -238,15 +174,11 @@ The final 3D coordinates are stored in an HDF5 file. For visualization in molecu
 
 ```bash
 python convert_h5_to_xtc.py \
-    --h5_file structures/full_coords_langevin_trajectory_trial.h5 \
-    --h5_key full_coords_langevin_trajectory_trial \
+    --h5_file structures/full_coords_langevin_trajectory_example.h5 \
+    --h5_key full_coords_langevin_trajectory_example \
     --ref_pdb /scratch/asengar/long_sim/atlas/kinase_1ptq_perturn/heavy_chain.pdb \
-    --output_xtc structures/full_coords_langevin_trajectory_trial.xtc
+    --output_xtc structures/full_coords_langevin_trajectory_example.xtc
 ```
-
-
-
-
 
 
 
