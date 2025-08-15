@@ -91,6 +91,7 @@ def parse_xlsx_bw_notations(filename):
     """
     Parses an XLSX file to extract BW notations.
     Assumes BW notations are in the second column (index 1) and skips the first row (header).
+    This function is now primarily for *additional* BW notations, not the main source.
     """
     bw_notations = []
     try:
@@ -107,22 +108,67 @@ def parse_xlsx_bw_notations(filename):
         print(f"Error parsing XLSX file {filename}: {e}")
     return bw_notations
 
+def parse_xlsx_for_helices(filename):
+    """
+    Parses an XLSX file to extract helix sequences, BW notation to residue ID mappings,
+    and the ordered list of BW notations for each helix.
+    Assumes helix names are on their own line (e.g., 'TM1'), followed by residue data.
+    Residue data columns: GPCRdb(A) (0), BW (1), ResidueInfo (e.g., 'M1') (2).
+    """
+    helices = {}
+    bw_to_resid = {}
+    helix_bw_notations = {}
+    current_helix = None
+
+    try:
+        workbook = openpyxl.load_workbook(filename)
+        sheet = workbook.active
+
+        for i, row in enumerate(sheet.iter_rows(values_only=True)):
+            if i == 0: # Skip header row
+                continue
+
+            # Check for helix name line (e.g., ('TM1', None, None, None))
+            if row[0] and isinstance(row[0], str) and (row[0].startswith("TM") or row[0].startswith("H8")) and row[1] is None:
+                current_helix = row[0].strip()
+                helices[current_helix] = ""
+                helix_bw_notations[current_helix] = []
+            elif current_helix and len(row) >= 3 and row[1] is not None: # Data row for a helix
+                bw_notation = str(row[1]).strip() # Column B (index 1)
+                res_info = str(row[2]).strip() # Column C (index 2), e.g., 'M1'
+
+                # Extract 1-letter code and residue ID from res_info (e.g., 'M1' -> 'M', '1')
+                res_code_match = re.match(r'([A-Z])(\d+)', res_info)
+                if res_code_match:
+                    one_letter_code = res_code_match.group(1)
+                    residue_id = res_code_match.group(2)
+
+                    if one_letter_code in aa_codes.values(): # Ensure it's a valid amino acid
+                        helices[current_helix] += one_letter_code
+                        bw_to_resid[bw_notation] = residue_id
+                        helix_bw_notations[current_helix].append(bw_notation)
+    except Exception as e:
+        print(f"Error parsing XLSX file {filename} for helices: {e}")
+        return {}, {}, {} # Return empty on error
+
+    return helices, bw_to_resid, helix_bw_notations
+
 def main():
     """
     Main function to perform sequence alignment.
     """
-    parser = argparse.ArgumentParser(description="Align helix sequences from d2_res.txt with a PDB file's sequence.")
-    parser.add_argument("--d2_res_file", type=str, default="d2_res.txt",
-                        help="Path to the d2_res.txt file containing helix sequences.")
+    parser = argparse.ArgumentParser(description="Align helix sequences from a source file (d2_res.txt or .xlsx) with a PDB file's sequence.")
+    parser.add_argument("--source_file", type=str, default="d2_res.txt",
+                        help="Path to the source file (d2_res.txt or .xlsx) containing helix sequences and BW notations.")
     parser.add_argument("--pdb_file", type=str, default="heavy_chain.pdb",
                         help="Path to the PDB file containing the full protein sequence.")
     parser.add_argument("--bw_notations", nargs='*', default=[],
                         help="List of BW notations (e.g., '3.50 3.51') to find corresponding residue IDs.")
     parser.add_argument("--xlsx_file", type=str, default=None,
-                        help="Path to an XLSX file containing BW notations in the first column.")
+                        help="Path to an *additional* XLSX file containing BW notations to find. This is separate from --source_file.")
     args = parser.parse_args()
 
-    d2_res_file = args.d2_res_file
+    source_file = args.source_file
     pdb_file = args.pdb_file
     
     bw_notations_to_find = []
@@ -134,10 +180,21 @@ def main():
         xlsx_bw_notations = parse_xlsx_bw_notations(args.xlsx_file)
         bw_notations_to_find.extend(xlsx_bw_notations)
 
-    # 1. Parse the helix sequences, BW to residue ID mapping, and helix BW notations from d2_res.txt
-    helix_sequences, bw_to_direct_resid_map, helix_bw_notations = parse_d2_res(d2_res_file)
+    # 1. Parse the helix sequences, BW to residue ID mapping, and helix BW notations from the source file
+    helix_sequences = {}
+    bw_to_direct_resid_map = {}
+    helix_bw_notations = {}
+
+    if source_file.endswith(".txt"):
+        helix_sequences, bw_to_direct_resid_map, helix_bw_notations = parse_d2_res(source_file)
+    elif source_file.endswith(".xlsx"):
+        helix_sequences, bw_to_direct_resid_map, helix_bw_notations = parse_xlsx_for_helices(source_file)
+    else:
+	print(f"Unsupported source file format: {source_file}. Please provide a .txt or .xlsx file.")
+        return
+
     if not helix_sequences and not bw_to_direct_resid_map:
-        print(f"Could not parse any helix sequences or BW notations from {d2_res_file}")
+        print(f"Could not parse any helix sequences or BW notations from {source_file}")
         return
 
     # 2. Parse the full sequence and PDB residue numbers from heavy_chain.pdb
@@ -194,15 +251,10 @@ def main():
                         print(f"BW Notation {bw_notation} (from {helix_name}): Helix not aligned, cannot determine aligned PDB Residue ID.")
                     break
             if not found_in_helix:
-                print(f"BW Notation {bw_notation}: Not found in {d2_res_file}")
+                print(f"BW Notation {bw_notation}: Not found in {source_file}")
         print("-----------------------------------------------------")
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
 
 
