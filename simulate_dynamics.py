@@ -1,4 +1,3 @@
-  GNU nano 5.6.1                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            simulate_dynamics.py                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       
 import argparse
 import torch
 import h5py
@@ -246,10 +245,10 @@ def main():
             sys.exit(1)
         # The input_channels for Conv2D is typically 1 for latent embeddings.
         model = DiffusionConv2D(input_channels=1,
-                                 hidden_channels=hidden_dim, # Re-using hidden_dim for conv_hidden_channels
-                                 is_conservative=is_conservative_model)
+                                hidden_channels=hidden_dim, # Re-using hidden_dim for conv_hidden_channels
+                                is_conservative=is_conservative_model)
     else:
-	print(f"Error: Unknown model type {model_type} from HDF5 attributes.")
+        print(f"Error: Unknown model type {model_type} from HDF5 attributes.")
         sys.exit(1)
 
     model = model.to(device)
@@ -281,7 +280,7 @@ def main():
         # which corresponds to (H, W) if C=1.
         z_t = z_t_initial.unsqueeze(0) # Add channel dimension (1, H, W)
     else:
-	z_t = z_t_initial # Should not happen
+        z_t = z_t_initial # Should not happen
 
     trajectory = []
     # Always save the initial state
@@ -361,4 +360,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
