@@ -181,30 +181,40 @@ def main():
             start_emb_filename += "_non_conservative.h5"
         full_start_emb_path = pathlib.Path(args.start_emb_dir) / start_emb_filename
 
-    # Load starting vector and extract metadata
+    # Load checkpoint
+    if not pathlib.Path(args.diff_ckpt).is_file():
+        print(f"Error: Checkpoint file not found at {args.diff_ckpt}.")
+        sys.exit(1)
+    print(f"Loading model checkpoint from: {args.diff_ckpt}")
+    checkpoint = torch.load(args.diff_ckpt, map_location=device)
+    
+    # Extract parameters from checkpoint
+    ckpt_params = checkpoint.get('params', {})
+    if not ckpt_params:
+        print("Error: 'params' key not found in checkpoint. Cannot infer model configuration.")
+        sys.exit(1)
+
+    model_type = ckpt_params.get('model_type', 'mlp_v2')
+    hidden_dim = ckpt_params.get('hidden_dim', 1024)
+    beta_start = ckpt_params.get('beta_start', 5e-6)
+    beta_end = ckpt_params.get('beta_end', 0.03)
+    diffusion_steps = ckpt_params.get('diffusion_steps', 1400)
+    is_conservative_model = ckpt_params.get('conservative', False) # Assuming 'conservative' flag is saved
+
+    print(f"Parameters loaded from checkpoint: model_type={model_type}, hidden_dim={hidden_dim}, "
+          f"beta_start={beta_start}, beta_end={beta_end}, diffusion_steps={diffusion_steps}, "
+          f"conservative={is_conservative_model}")
+
+    # Load starting vector
     try:
         with h5py.File(full_start_emb_path, 'r') as f:
             start_vectors = f[args.start_emb_key][:]
-            # Read model parameters from HDF5 attributes for robustness
-            h5_attrs = f[args.start_emb_key].attrs
-            model_type = h5_attrs.get('model_type', 'mlp_v2') # Default if not found
-            hidden_dim = h5_attrs.get('hidden_dim', 1024) # Default if not found
-            beta_start = h5_attrs.get('beta_start', 5e-6)
-            beta_end = h5_attrs.get('beta_end', 0.03)
-            diffusion_steps = h5_attrs.get('diffusion_steps', 1400)
-            # The 'conservative' flag from new_diff.py output
-            is_conservative_model = h5_attrs.get('conservative', False) # Default to False
-
         print(f"Loaded starting embeddings from: {full_start_emb_path}")
-        print(f"Inferred model_type: {model_type}, hidden_dim: {hidden_dim}")
-        print(f"Inferred diffusion_steps: {diffusion_steps}, beta_start: {beta_start}, beta_end: {beta_end}")
-        print(f"Inferred conservative model: {is_conservative_model}")
-
     except Exception as e:
         print(f"Error loading starting embedding from {full_start_emb_path}: {e}")
         sys.exit(1)
     
-    # Corrected: Use start_exp_idx for selecting the starting vector
+    # Validate start_exp_idx
     if args.start_exp_idx >= start_vectors.shape[0] or args.start_exp_idx < 0:
         print(f"Error: start_exp_idx {args.start_exp_idx} is out of bounds for file with {start_vectors.shape[0]} vectors.")
         sys.exit(1)
@@ -250,6 +260,14 @@ def main():
     else:
         print(f"Error: Unknown model type {model_type} from HDF5 attributes.")
         sys.exit(1)
+
+    # Load checkpoint
+    if pathlib.Path(args.diff_ckpt).is_file():
+        print(f"Loading model checkpoint from: {args.diff_ckpt}")
+        checkpoint = torch.load(args.diff_ckpt, map_location=device)
+        model.load_state_dict(checkpoint['model_state_dict'])
+    else:
+        print(f"Warning: Checkpoint file not found at {args.diff_ckpt}. Running with untrained model.")
 
     model = model.to(device)
     model.eval()
@@ -323,6 +341,9 @@ def main():
                 # Non-conservative model predicts noise
                 predicted_noise = model(model_input_for_grad, t_for_model, diffusion_steps).squeeze(0) # (FlatDim,) or (C, H, W)
                 score = -predicted_noise / noise_level_sigma
+
+            if step == 0:
+                print(f"Initial score/force vector norm: {torch.linalg.norm(score).item():.6f}")
 
             # --- Score Clipping for Stability ---
             if args.score_clip_value is not None:
